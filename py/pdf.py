@@ -2,17 +2,16 @@ import os
 import tempfile
 from PyPDF2 import PdfReader, PdfWriter
 
-def process_image_xobject(xobject, size_threshold, location_info=""):
+def process_large_xobject(xobject, size_threshold, location_info=""):
     """Helper function to check and potentially remove an image XObject"""
-    if (xobject.get("/Subtype") == "/Image" and 
-        hasattr(xobject, "get_data")):
+    if hasattr(xobject, "get_data"):
         try:
             data_size = len(xobject.get_data())
             if data_size > size_threshold:
-                print(f"Removed Image {location_info} ({data_size/1024:.1f}KB)")
+                print(f"Removed Object {location_info} ({data_size/1024:.1f}KB)")
                 return True
         except Exception as e:
-            print(f"Warning: Could not process image {location_info}: {str(e)}")
+            print(f"Warning: Could not process object {location_info}: {str(e)}")
     return False
 
 def process_form_xobject(form, size_threshold, parent_key=""):
@@ -31,14 +30,14 @@ def process_form_xobject(form, size_threshold, parent_key=""):
                         process_form_xobject(xobject, size_threshold, location)
                     
                     # Handle images within the form
-                    elif process_image_xobject(xobject, size_threshold, location):
+                    if process_large_xobject(xobject, size_threshold, location):
                         del xobjects[key]
                         
                 except Exception as e:
                     print(f"Warning: Error processing form XObject {key}: {str(e)}")
 
 
-def remove_large_xobjects(input_filename, output_filename, max_size=1024):
+def remove_large_xobjects(input_filename, output_filename, max_size=1024, max_pages=10):
     """
     Reads a PDF, removes XObjects larger than the specified size, and writes it back out.
 
@@ -51,30 +50,28 @@ def remove_large_xobjects(input_filename, output_filename, max_size=1024):
     reader = PdfReader(input_filename)
     writer = PdfWriter()
 
-    for page in reader.pages:
-        if "/Resources" not in page:
-            continue
-        resources = page["/Resources"]
-        if "/XObject" not in resources:
-            continue
-        xobjects = resources["/XObject"]
-        to_remove = []
+    for page_num, page in enumerate(reader.pages, 1):
+        if page_num > max_pages:
+            break
+        if "/Resources" in page:
+            resources = page["/Resources"]
+            if "/XObject" in resources:
+                xobjects = resources["/XObject"]
+                to_remove = []
 
-        for key, obj in xobjects.items():
-            # Access the XObject stream
-            xobject = reader.get_object(obj)
-            if hasattr(xobject, 'get_data'):
-                data = xobject.get_data()
-                if len(data) > max_size:
-                    to_remove.append(key)
+                for key, obj in xobjects.items():
+                    # Access the XObject stream
+                    xobject = reader.get_object(obj)
+                    location = f"Page{page_num}->{key}"
+                    # Handle forms (which might contain images)
+                    if xobject.get("/Subtype") == "/Form":
+                        process_form_xobject(xobject, max_size, location)
+                    if process_large_xobject(xobject, max_size, location):
+                        to_remove.append(key)
 
-            # Handle forms (which might contain images)
-            elif xobject.get("/Subtype") == "/Form":
-                process_form_xobject(xobject, size_threshold, location)
-
-            # Remove the large XObjects from the page
-            for key in to_remove:
-                del xobjects[key]
+                # Remove the large XObjects from the page
+                for key in to_remove:
+                    del xobjects[key]
 
         # Add the cleaned-up page to the writer
         writer.add_page(page)
@@ -95,4 +92,4 @@ def remove_large_xobjects(input_filename, output_filename, max_size=1024):
         os.replace(temp_file, input_filename)
 
 def clip_and_compress_pdf(name0, name1, max_pages=8, image_max_size=(100, 100), image_quality=10):
-    remove_large_xobjects(name0, name1, max_size=1024)
+    remove_large_xobjects(name0, name1, max_size=1024, max_pages=10)
