@@ -118,12 +118,10 @@ if __name__ == "__main__":
     
     for icml_dict in tqdm.cli.tqdm(data):
       paperhash = icml_dict['content']['paperhash']['value']
-      #if "wang|one_prompt" not in paperhash:
-      #  continue
-      pdf_path = process(icml_dict, overwrite=True)
+      pdf_path = process(icml_dict, overwrite=False)
       txt_path = pdf_path.replace('.pdf', '.txt').replace('pdfs/', 'summaries/')
-      #if os.path.exists(txt_path):
-      #  print('file already exists')
-      #else:
-      #  summarize(pdf_path, txt_path, api_key)
-      #  time.sleep(1)
+      if os.path.exists(txt_path):
+        print('file already exists')
+      else:
+        summarize(pdf_path, txt_path, api_key)
+        time.sleep(1)
