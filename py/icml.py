@@ -1,20 +1,10 @@
-import anthropic
-import base64
-import io
 import json
 import os
 import os
 import pprint
 import requests
-import shutil
-import tempfile
 import time
 import tqdm
-from PIL import Image
-from PIL.Image import Resampling
-from PIL.Image import open as PILopen
-from PyPDF2 import PdfReader, PdfWriter
-import zlib
 import py.pdf
 import py.anthropic
 
@@ -31,12 +21,11 @@ def process(icml_dict, overwrite=False):
   )
   if os.path.exists(filename) and not overwrite:
     print("file already exists")
-  else:
-    response = requests.get(pdf_url)
-    with open(filename, 'wb') as f:
-        f.write(response.content)
-  if True:
-    py.pdf.clip_and_compress_pdf(filename, filename, max_pages=8, image_max_size=(100, 100), image_quality=10)
+    return filename
+  response = requests.get(pdf_url)
+  with open(filename, 'wb') as f:
+      f.write(response.content)
+  py.pdf.clip_and_compress_pdf(filename, filename, max_pages=8, image_max_size=(100, 100), image_quality=10)
   return filename
 
 # Example usage
@@ -52,7 +41,8 @@ if __name__ == "__main__":
       pdf_path = process(icml_dict, overwrite=False)
       txt_path = pdf_path.replace('.pdf', '.txt').replace('pdfs/', 'summaries/')
       #if os.path.exists(txt_path):
-        #print('file already exists')
+      #  print('file already exists')
       #else:
+      if True:
         py.anthropic.summarize(pdf_path, txt_path, api_key)
         time.sleep(1)

@@ -1,21 +1,5 @@
 import anthropic
 import base64
-import io
-import json
-import os
-import os
-import pprint
-import requests
-import shutil
-import tempfile
-import time
-import tqdm
-from PIL import Image
-from PIL.Image import Resampling
-from PIL.Image import open as PILopen
-from PyPDF2 import PdfReader, PdfWriter
-import zlib
-import py.pdf
 
 def read_pdf_as_base64(file_path: str) -> str:
     """Read a PDF file and convert it to base64 encoding."""
