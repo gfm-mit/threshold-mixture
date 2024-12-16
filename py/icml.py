@@ -1,24 +1,29 @@
-import json
-import pprint
 import anthropic
-import requests
 import base64
+import io
+import json
 import os
+import os
+import pprint
+import requests
+import shutil
+import tempfile
 import time
 import tqdm
-from PyPDF2 import PdfReader, PdfWriter
-from PIL.Image import open as PILopen
+
 from PIL.Image import Resampling
-import io
-import os
+from PIL.Image import open as PILopen
+from PyPDF2 import PdfReader, PdfWriter
 
 
-def compress_image(image_data, max_size=(1000, 1000), quality=60):
+
+def compress_image_data(image_data, image_format, max_size=(1000, 1000), quality=60):
     """
     Compress an image using PIL/Pillow.
     
     Args:
         image_data (bytes): Original image data
+        image_format (str): Format of the input image ('RGB' or 'RGBA')
         max_size (tuple): Maximum dimensions (width, height)
         quality (int): JPEG quality (0-100)
     
@@ -26,8 +31,18 @@ def compress_image(image_data, max_size=(1000, 1000), quality=60):
         bytes: Compressed image data
     """
     try:
-        # Open the image
-        img = PILopen(io.BytesIO(image_data))
+        # Create image from raw data
+        if image_format == 'RGBA':
+            mode = 'RGBA'
+        else:
+            mode = 'RGB'
+            
+        # Get image dimensions from the PDF object
+        width = int(size[0])
+        height = int(size[1])
+        
+        # Create Image object from raw data
+        img = Image.frombytes(mode, (width, height), image_data)
         
         # Convert RGBA to RGB if necessary
         if img.mode == 'RGBA':
@@ -37,19 +52,20 @@ def compress_image(image_data, max_size=(1000, 1000), quality=60):
         ratio = min(max_size[0] / img.width, max_size[1] / img.height)
         if ratio < 1:
             new_size = (int(img.width * ratio), int(img.height * ratio))
-            img = img.resize(new_size, Resampling.LANCZOS)
+            img = img.resize(new_size, Image.Resampling.LANCZOS)
         
         # Save compressed image to bytes
         output = io.BytesIO()
         img.save(output, format='JPEG', quality=quality, optimize=True)
         return output.getvalue()
     except Exception as e:
-        print(f"Error compressing image: {str(e)}")
+        print(f"Error in image compression: {str(e)}")
         return image_data
 
 def clip_and_compress_pdf(input_path, output_path, max_pages=10, image_max_size=(1000, 1000), image_quality=60):
     """
     Creates a new PDF with only the first N pages and compressed images.
+    Safely handles cases where input_path and output_path are the same.
     
     Args:
         input_path (str): Path to the input PDF file
@@ -62,16 +78,29 @@ def clip_and_compress_pdf(input_path, output_path, max_pages=10, image_max_size=
         bool: True if successful, False if there was an error
     """
     try:
+        # Create a temporary file
+        temp_output = None
+        using_temp = input_path == output_path
+        
+        if using_temp:
+            temp_fd, temp_output = tempfile.mkstemp(suffix='.pdf')
+            os.close(temp_fd)
+            actual_output = temp_output
+        else:
+            actual_output = output_path
+            
         # Create PDF reader and writer objects
         reader = PdfReader(input_path)
         writer = PdfWriter()
         
         # Determine how many pages to include
         pages_to_include = min(len(reader.pages), max_pages)
+        print(f"Processing {pages_to_include} pages...")
         
         # Process each page
         for page_num in range(pages_to_include):
             page = reader.pages[page_num]
+            print(f"Processing page {page_num + 1}")
             
             # Process images on the page if any exist
             if '/Resources' in page and '/XObject' in page['/Resources']:
@@ -80,32 +109,62 @@ def clip_and_compress_pdf(input_path, output_path, max_pages=10, image_max_size=
                 for obj in xObject:
                     if xObject[obj]['/Subtype'] == '/Image':
                         try:
+                            global size  # Used in compress_image_data
                             size = (xObject[obj]['/Width'], xObject[obj]['/Height'])
+                            
                             if size[0] > image_max_size[0] or size[1] > image_max_size[1]:
-                                if xObject[obj]['/Filter'] == '/DCTDecode':
-                                    # JPEG image
-                                    img_data = xObject[obj]._data
-                                    compressed_data = compress_image(img_data, image_max_size, image_quality)
-                                    xObject[obj]._data = compressed_data
-                                elif xObject[obj]['/Filter'] == '/FlateDecode':
-                                    # PNG image
-                                    img_data = xObject[obj]._data
-                                    compressed_data = compress_image(img_data, image_max_size, image_quality)
-                                    xObject[obj]._data = compressed_data
+                                print(f"Found large image: {size[0]}x{size[1]}")
+                                
+                                # Extract image data based on colorspace
+                                if '/ColorSpace' in xObject[obj]:
+                                    if xObject[obj]['/ColorSpace'] == '/DeviceRGB':
+                                        mode = 'RGB'
+                                    elif xObject[obj]['/ColorSpace'] == '/DeviceCMYK':
+                                        print("Skipping CMYK image")
+                                        continue
+                                    else:
+                                        mode = 'RGB'
+                                else:
+                                    mode = 'RGB'
+                                
+                                img_data = xObject[obj].get_data()
+                                compressed_data = compress_image_data(img_data, mode, image_max_size, image_quality)
+                                xObject[obj]._data = compressed_data
+                                print("Image compressed successfully")
+                                
                         except Exception as e:
                             print(f"Error processing image on page {page_num + 1}: {str(e)}")
+                            continue
             
             writer.add_page(page)
         
         # Write the output file
-        with open(output_path, 'wb') as output_file:
+        print(f"Writing compressed PDF to {actual_output}")
+        with open(actual_output, 'wb') as output_file:
             writer.write(output_file)
         
+        # If we used a temporary file, replace the original
+        if using_temp:
+            print("Replacing original file with processed version")
+            shutil.move(temp_output, output_path)
+        
+        print("PDF processing completed successfully")
         return True
         
     except Exception as e:
         print(f"Error processing PDF: {str(e)}")
+        # Clean up temporary file if it exists
+        if temp_output and os.path.exists(temp_output):
+            os.remove(temp_output)
         return False
+    finally:
+        # Make sure we clean up the temp file if something went wrong
+        if temp_output and os.path.exists(temp_output):
+            try:
+                os.remove(temp_output)
+            except:
+                pass
+
 
 def process(icml_dict, overwrite=False):
   icml_dict = {
