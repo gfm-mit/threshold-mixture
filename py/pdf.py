@@ -37,81 +37,62 @@ def process_form_xobject(form, size_threshold, parent_key=""):
                 except Exception as e:
                     print(f"Warning: Error processing form XObject {key}: {str(e)}")
 
-def strip_large_images(input_file, output_file, size_threshold_kb=1):
+
+def remove_large_xobjects(input_filename, output_filename, max_size=1024):
     """
-    Strips images larger than the specified threshold from a PDF file,
-    including images inside forms.
-    
-    Args:
-        input_file (str): Path to input PDF file
-        output_file (str): Path to output PDF file
-        size_threshold_kb (float): Size threshold in kilobytes (default: 1)
+    Reads a PDF, removes XObjects larger than the specified size, and writes it back out.
+
+    :param input_filename: Path to the input PDF file
+    :param output_filename: Path to the output PDF file
+    :param max_size: Maximum allowed size for XObjects (in bytes)
     """
-    # Convert threshold to bytes
-    size_threshold = size_threshold_kb * 1024
-    
-    # Create a temporary file
-    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-        temp_path = temp_file.name
-        
-        # Read the input PDF
-        reader = PdfReader(input_file)
-        writer = PdfWriter()
-        
-        # Process each page
-        for page_num, page in enumerate(reader.pages, 1):
-            if "/Resources" in page:
-                resources = page["/Resources"]
-                
-                # Process XObjects (including forms)
-                if "/XObject" in resources:
-                    xobjects = resources["/XObject"]
-                    for key in list(xobjects.keys()):
-                        try:
-                            xobject = xobjects[key]
-                            location = f"Page{page_num}->{key}"
-                            
-                            # Handle forms (which might contain images)
-                            if xobject.get("/Subtype") == "/Form":
-                                process_form_xobject(xobject, size_threshold, location)
-                            
-                            # Handle direct images
-                            elif process_image_xobject(xobject, size_threshold, location):
-                                del xobjects[key]
-                                
-                        except Exception as e:
-                            print(f"Warning: Error processing XObject {key}: {str(e)}")
-                
-                # Process regular images
-                if "/Images" in resources:
-                    images = resources["/Images"]
-                    for key in list(images.keys()):
-                        try:
-                            image = images[key]
-                            location = f"Page{page_num}->Images->{key}"
-                            if process_image_xobject(image, size_threshold, location):
-                                del images[key]
-                        except Exception as e:
-                            print(f"Warning: Error processing Image {key}: {str(e)}")
-            
-            # Add the modified page to the writer
-            writer.add_page(page)
-        
-        # Write to temporary file first
-        with open(temp_path, "wb") as temp_output:
-            writer.write(temp_output)
-        
-        # If input and output are different, directly move the temp file
-        if input_file != output_file:
-            os.rename(temp_path, output_file)
-        else:
-            # If they're the same, we need to do a replace
-            os.remove(input_file)
-            os.rename(temp_path, output_file)
+    # Open the input PDF file
+    print("reading pdf", input_filename)
+    reader = PdfReader(input_filename)
+    writer = PdfWriter()
+
+    for page in reader.pages:
+        if "/Resources" not in page:
+            continue
+        resources = page["/Resources"]
+        if "/XObject" not in resources:
+            continue
+        xobjects = resources["/XObject"]
+        to_remove = []
+
+        for key, obj in xobjects.items():
+            # Access the XObject stream
+            xobject = reader.get_object(obj)
+            if hasattr(xobject, 'get_data'):
+                data = xobject.get_data()
+                if len(data) > max_size:
+                    to_remove.append(key)
+
+            # Handle forms (which might contain images)
+            elif xobject.get("/Subtype") == "/Form":
+                process_form_xobject(xobject, size_threshold, location)
+
+            # Remove the large XObjects from the page
+            for key in to_remove:
+                del xobjects[key]
+
+        # Add the cleaned-up page to the writer
+        writer.add_page(page)
+
+    # Use a temporary file if the input and output filenames are the same
+    temp_file = None
+    if input_filename == output_filename:
+        temp_fd, temp_file = tempfile.mkstemp(suffix='.pdf')
+        os.close(temp_fd)  # Close the file descriptor
+        output_filename = temp_file
+
+    # Write the updated PDF to the output file
+    with open(output_filename, 'wb') as output_file:
+        writer.write(output_file)
+
+    # Replace the original file with the updated file if a temporary file was used
+    if temp_file:
+        os.replace(temp_file, input_filename)
 
 def clip_and_compress_pdf(name0, name1, max_pages=8, image_max_size=(100, 100), image_quality=10):
-    strip_large_images(name0, name1, size_threshold_kb=1)
-
-# Example usage
-if __name__ == "__main__":
-    strip_large_xobjects("input.pdf", "output.pdf", size_threshold_kb=1)
+    remove_large_xobjects(name0, name1, max_size=1024)

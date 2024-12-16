@@ -30,11 +30,11 @@ def process(icml_dict, overwrite=False):
   )
   if os.path.exists(filename) and not overwrite:
     print("file already exists")
-    return filename
-  response = requests.get(pdf_url)
-  with open(filename, 'wb') as f:
-      f.write(response.content)
-  if overwrite:
+  else:
+    response = requests.get(pdf_url)
+    with open(filename, 'wb') as f:
+        f.write(response.content)
+  if True:
     py.pdf.clip_and_compress_pdf(filename, filename, max_pages=8, image_max_size=(100, 100), image_quality=10)
   return filename
 
@@ -117,8 +117,11 @@ if __name__ == "__main__":
         api_key = f.read()
     
     for icml_dict in tqdm.cli.tqdm(data):
-      if "bala" not in icml_dict['content']['paperhash']['value']:
+      paperhash = icml_dict['content']['paperhash']['value']
+      if "bala" not in paperhash and "unveiling" not in paperhash:
         continue
+      #if "bala" not in paperhash:
+      #  continue
       pdf_path = process(icml_dict, overwrite=True)
       txt_path = pdf_path.replace('.pdf', '.txt').replace('pdfs/', 'summaries/')
       #if os.path.exists(txt_path):
