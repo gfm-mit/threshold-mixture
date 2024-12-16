@@ -4,6 +4,14 @@ from PyPDF2 import PdfReader, PdfWriter
 
 def process_large_xobject(xobject, size_threshold, location_info=""):
     """Helper function to check and potentially remove an image XObject"""
+    if hasattr(xobject, "_data"):
+        try:
+            data_size = len(xobject._data)
+            if data_size > size_threshold:
+                print(f"Removed Object {location_info} ({data_size/1024:.1f}KB)")
+                return True
+        except Exception as e:
+            print(f"Warning: Could not process object {location_info}: {str(e)}")
     if hasattr(xobject, "get_data"):
         try:
             data_size = len(xobject.get_data())

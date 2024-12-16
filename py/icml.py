@@ -118,9 +118,7 @@ if __name__ == "__main__":
     
     for icml_dict in tqdm.cli.tqdm(data):
       paperhash = icml_dict['content']['paperhash']['value']
-      #if "bala" not in paperhash and "unveiling" not in paperhash:
-      #  continue
-      #if "bala" not in paperhash:
+      #if "wang|one_prompt" not in paperhash:
       #  continue
       pdf_path = process(icml_dict, overwrite=True)
       txt_path = pdf_path.replace('.pdf', '.txt').replace('pdfs/', 'summaries/')
