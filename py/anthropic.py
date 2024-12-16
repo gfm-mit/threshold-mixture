@@ -54,7 +54,7 @@ def query_pdf(pdf_path: str, question: str, api_key: str) -> str:
         response = client.beta.messages.create(
             model="claude-3-5-sonnet-20241022",
             messages=messages,
-            max_tokens=1024,
+            max_tokens=2048,
             betas=["pdfs-2024-09-25"],
         )
         return response.content[0].text
@@ -62,7 +62,6 @@ def query_pdf(pdf_path: str, question: str, api_key: str) -> str:
         raise Exception(f"Error calling Anthropic API: {str(e)}")
 
 def summarize(pdf_path, txt_path, api_key):
-    question = "What binary classification evaluation metrics are used in this paper?  In particular does it use any of Recall, Precision, F1, Accuracy, Net Cost, Net Benefit, AUC-ROC, AUC-PR, Decision Curve Analysis, Brier Score, Log Loss, Perplexity, RMSE?"
     question = """
 You are an AI assistant specializing in analyzing research papers, particularly in the field of machine learning and data science. Your task is to examine the content of a research paper and identify which binary classification evaluation metrics are used.
 
@@ -88,6 +87,49 @@ Your final output should be a JSON array containing objects for each of the list
 
 Ensure that your JSON output includes all the metrics mentioned in the list above, even if they are not present in the paper. For metrics not present, set "present" to false and include a brief note explaining their absence.
     """
+    question = """
+Here is the full text of the research paper you need to analyze:
+
+<research_paper>
+{{pdf}}
+</research_paper>
+
+You are an AI assistant specializing in analyzing research papers in the field of machine learning and data science. Your task is to examine the content of a research paper and identify which binary classification evaluation metrics are used.
+
+Your goal is to determine which of the following binary classification evaluation metrics are used in the paper:
+Recall, Precision, F1, Accuracy, Net Cost, Net Benefit, AUC-ROC, AUC-PR, Decision Curve Analysis, Brier Score, Log Loss, Cross Entropy, Perplexity, RMSE
+
+Follow these steps:
+
+1. Carefully read through the research paper content.
+2. In <metric_scan> tags, for each metric in the list above:
+   a. Search for mentions of the metric in the paper.
+   b. If found, write down relevant quotes that mention or describe the use of the metric.
+   c. If not found, note its absence.
+3. In <metric_evaluation> tags, analyze your findings for each metric:
+   - Determine if it is present in the paper based on the quotes you found.
+   - If present, briefly explain the context of its use.
+   - If not present, note its absence.
+   - Keep your analysis concise to ensure all metrics can be covered.
+4. After analyzing all metrics, compile your findings into a structured JSON array.
+
+Your final output should be a JSON array containing objects for each of the listed metrics, regardless of whether they are present in the paper or not. The array should have the following structure:
+
+[{
+  "name": "Metric Name",
+  "present": true/false,
+  "notes": "Brief details or context (max 50 words)"
+}]
+
+Ensure that your JSON output:
+- Includes all the metrics mentioned in the list above, even if they are not present in the paper.
+- Is correctly formatted as an array of dictionaries, with proper syntax.
+- Contains brief notes (maximum 50 words per metric) to keep the overall length manageable.
+
+If you find that your analysis is becoming too long (approaching 1024 tokens), prioritize the most relevant and clearly present metrics in your detailed analysis, while still including all metrics in the final JSON output.
+
+Begin your response with your metric scan, followed by your metric evaluation, and then the JSON output.
+"""
     try:
         response = query_pdf(pdf_path, question, api_key)
         with open(txt_path, 'w') as f:

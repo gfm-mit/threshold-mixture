@@ -20,7 +20,7 @@ def process(icml_dict, overwrite=False):
     icml_dict['paperhash'].replace('|', '_')
   )
   if os.path.exists(filename) and not overwrite:
-    print("file already exists")
+    print("PDF already exists")
     return filename
   response = requests.get(pdf_url)
   with open(filename, 'wb') as f:
