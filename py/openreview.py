@@ -24,6 +24,21 @@ def scrape_urls(kind, count=2275):
 
     return dict(notes=notes, count=len(notes))
 
+def download(icml_dict):
+  icml_dict = {
+    k: v['value']
+    for k, v in icml_dict['content'].items()
+  }
+  tpl_url = "https://openreview.net/{}"
+  pdf_url = tpl_url.format(icml_dict['pdf'])
+  raw_filename = "raw_pdfs/{}.pdf".format(
+    icml_dict['paperhash'].replace('|', '_')
+  )
+  response = requests.get(pdf_url)
+  with open(raw_filename, 'wb') as f:
+      f.write(response.content)
+  return raw_filename
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Pretty-print a JSON file.')
     parser.add_argument('--filename', type=str, help='Path to the JSON file to pretty-print.')
