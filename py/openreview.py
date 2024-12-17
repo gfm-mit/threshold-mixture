@@ -34,6 +34,9 @@ def download(icml_dict):
   raw_filename = "raw_pdfs/{}.pdf".format(
     icml_dict['paperhash'].replace('|', '_')
   )
+  if os.path.exists(raw_filename):
+    print("PDF already downloaded:", raw_filename)
+    return raw_filename
   response = requests.get(pdf_url)
   with open(raw_filename, 'wb') as f:
       f.write(response.content)
