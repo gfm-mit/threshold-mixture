@@ -1,6 +1,8 @@
 import os
 import tempfile
 from PyPDF2 import PdfReader, PdfWriter
+import tqdm
+import requests
 
 def process_large_xobject(xobject, size_threshold, location_info=""):
     """Helper function to check and potentially remove an image XObject"""
@@ -99,5 +101,7 @@ def remove_large_xobjects(input_filename, output_filename, max_size=1024, max_pa
     if temp_file:
         os.replace(temp_file, input_filename)
 
-def clip_and_compress_pdf(name0, name1, max_pages=8, image_max_size=(100, 100), image_quality=10):
-    remove_large_xobjects(name0, name1, max_size=1024, max_pages=10)
+def strip_pdf(raw_filename):
+  stripped_filename = raw_filename.replace('raw_pdfs/', 'stripped_pdfs/')
+  remove_large_xobjects(raw_filename, stripped_filename, max_pages=10, max_size=1024)
+  return stripped_filename
