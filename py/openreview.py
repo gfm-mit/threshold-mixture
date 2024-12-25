@@ -24,19 +24,22 @@ def scrape_urls(kind, count=2275):
 
     return dict(notes=notes, count=len(notes))
 
-def download(icml_dict):
+def download(icml_dict, prefix="", already_downloaded=False):
   icml_dict = {
     k: v['value']
     for k, v in icml_dict['content'].items()
   }
   tpl_url = "https://openreview.net/{}"
   pdf_url = tpl_url.format(icml_dict['pdf'])
-  raw_filename = "raw_pdfs/{}.pdf".format(
+  raw_filename = "raw_pdfs/{}{}.pdf".format(
+    prefix,
     icml_dict['paperhash'].replace('|', '_')
   )
   if os.path.exists(raw_filename):
-    print("PDF already downloaded:", raw_filename)
+    #print("PDF already downloaded:", raw_filename)
     return raw_filename
+  else:
+    assert not already_downloaded
   response = requests.get(pdf_url)
   with open(raw_filename, 'wb') as f:
       f.write(response.content)
