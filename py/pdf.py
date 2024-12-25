@@ -4,13 +4,14 @@ from PyPDF2 import PdfReader, PdfWriter
 import tqdm
 import requests
 
-def process_large_xobject(xobject, size_threshold, location_info=""):
+def process_large_xobject(xobject, size_threshold, location_info="", verbose=True):
     """Helper function to check and potentially remove an image XObject"""
     if hasattr(xobject, "_data"):
         try:
             data_size = len(xobject._data)
             if data_size > size_threshold:
-                print(f"Removed Object {location_info} ({data_size/1024:.1f}KB)")
+                if verbose:
+                    print(f"Removed Object {location_info} ({data_size/1024:.1f}KB)")
                 return True
         except Exception as e:
             print(f"Warning: Could not process object {location_info}: {str(e)}")
@@ -18,13 +19,14 @@ def process_large_xobject(xobject, size_threshold, location_info=""):
         try:
             data_size = len(xobject.get_data())
             if data_size > size_threshold:
-                print(f"Removed Object {location_info} ({data_size/1024:.1f}KB)")
+                if verbose:
+                    print(f"Removed Object {location_info} ({data_size/1024:.1f}KB)")
                 return True
         except Exception as e:
             print(f"Warning: Could not process object {location_info}: {str(e)}")
     return False
 
-def process_form_xobject(form, size_threshold, parent_key=""):
+def process_form_xobject(form, size_threshold, parent_key="", verbose=True):
     """Process images inside a Form XObject"""
     if "/Resources" in form:
         resources = form["/Resources"]
@@ -37,17 +39,17 @@ def process_form_xobject(form, size_threshold, parent_key=""):
                     
                     # Handle nested forms
                     if xobject.get("/Subtype") == "/Form":
-                        process_form_xobject(xobject, size_threshold, location)
+                        process_form_xobject(xobject, size_threshold, location, verbose=verbose)
                     
                     # Handle images within the form
-                    if process_large_xobject(xobject, size_threshold, location):
+                    if process_large_xobject(xobject, size_threshold, location, verbose=verbose):
                         del xobjects[key]
                         
                 except Exception as e:
                     print(f"Warning: Error processing form XObject {key}: {str(e)}")
 
 
-def remove_large_xobjects(input_filename, output_filename, max_size=1024, max_pages=10):
+def remove_large_xobjects(input_filename, output_filename, max_size=1024, max_pages=10, verbose=True):
     """
     Reads a PDF, removes XObjects larger than the specified size, and writes it back out.
 
@@ -75,8 +77,8 @@ def remove_large_xobjects(input_filename, output_filename, max_size=1024, max_pa
                     location = f"Page{page_num}->{key}"
                     # Handle forms (which might contain images)
                     if xobject.get("/Subtype") == "/Form":
-                        process_form_xobject(xobject, max_size, location)
-                    if process_large_xobject(xobject, max_size, location):
+                        process_form_xobject(xobject, max_size, location, verbose=verbose)
+                    if process_large_xobject(xobject, max_size, location, verbose=verbose):
                         to_remove.append(key)
 
                 # Remove the large XObjects from the page
@@ -101,7 +103,10 @@ def remove_large_xobjects(input_filename, output_filename, max_size=1024, max_pa
     if temp_file:
         os.replace(temp_file, input_filename)
 
-def strip_pdf(raw_filename):
+def strip_pdf(raw_filename, verbose=True):
   stripped_filename = raw_filename.replace('raw_pdfs/', 'stripped_pdfs/')
-  remove_large_xobjects(raw_filename, stripped_filename, max_pages=10, max_size=1024)
+  if os.path.exists(stripped_filename):
+      #print("stripped pdf already exists:", stripped_filename)
+      return stripped_filename
+  remove_large_xobjects(raw_filename, stripped_filename, max_pages=10, max_size=1024, verbose=verbose)
   return stripped_filename
