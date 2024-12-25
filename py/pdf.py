@@ -26,7 +26,7 @@ def process_large_xobject(xobject, size_threshold, location_info="", verbose=Tru
             print(f"Warning: Could not process object {location_info}: {str(e)}")
     return False
 
-def process_form_xobject(form, size_threshold, parent_key="", verbose=True):
+def process_form_xobject(form, size_threshold, parent_key="", verbose=True, ancestors=set()):
     """Process images inside a Form XObject"""
     if "/Resources" in form:
         resources = form["/Resources"]
@@ -36,10 +36,12 @@ def process_form_xobject(form, size_threshold, parent_key="", verbose=True):
                 try:
                     xobject = xobjects[key]
                     location = f"{parent_key}->Form->{key}" if parent_key else f"Form->{key}"
+                    print(location)
                     
                     # Handle nested forms
                     if xobject.get("/Subtype") == "/Form":
-                        process_form_xobject(xobject, size_threshold, location, verbose=verbose)
+                        assert location not in ancestors, "cursed! object tree has a cycle: {}\n{}\n".format(ancestors, location)
+                        process_form_xobject(xobject, size_threshold, location, verbose=verbose, ancestors=ancestors | {location})
                     
                     # Handle images within the form
                     if process_large_xobject(xobject, size_threshold, location, verbose=verbose):
@@ -77,7 +79,7 @@ def remove_large_xobjects(input_filename, output_filename, max_size=1024, max_pa
                     location = f"Page{page_num}->{key}"
                     # Handle forms (which might contain images)
                     if xobject.get("/Subtype") == "/Form":
-                        process_form_xobject(xobject, max_size, location, verbose=verbose)
+                        process_form_xobject(xobject, max_size, location, verbose=verbose, ancestors=set())
                     if process_large_xobject(xobject, max_size, location, verbose=verbose):
                         to_remove.append(key)
 
