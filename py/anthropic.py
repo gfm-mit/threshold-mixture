@@ -1,3 +1,4 @@
+import time
 import anthropic
 import base64
 
@@ -7,7 +8,7 @@ def read_pdf_as_base64(file_path: str) -> str:
         return base64.b64encode(f.read()).decode("utf-8")
 
 
-def query_pdf(pdf_path: str, question: str, api_key: str, media_type: str = "application/pdf") -> str:
+def query_pdf(file_path: str, question: str, api_key: str, pdf: bool = False) -> str:
     """
     Upload a PDF and ask a question about it using the Anthropic API.
     
@@ -23,9 +24,9 @@ def query_pdf(pdf_path: str, question: str, api_key: str, media_type: str = "app
     client = anthropic.Client(api_key=api_key)
     
     # Read and encode the PDF
-    if media_type == "application/pdf":
+    if pdf:
         try:
-            pdf_base64 = read_pdf_as_base64(pdf_path)
+            pdf_base64 = read_pdf_as_base64(file_path)
         except Exception as e:
             raise Exception(f"Error reading PDF file: {str(e)}")
         document = {
@@ -36,7 +37,7 @@ def query_pdf(pdf_path: str, question: str, api_key: str, media_type: str = "app
                 "data": pdf_base64
             }}
     else:
-        pdf_base64 = open(pdf_path, 'r').read()
+        pdf_base64 = open(file_path, 'r').read()
         document = {
             "type": "text",
             "text": pdf_base64
@@ -59,20 +60,25 @@ def query_pdf(pdf_path: str, question: str, api_key: str, media_type: str = "app
     # Send the request
     try:
         kwargs = dict(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-3-5-haiku-20241022",
             messages=messages,
             max_tokens=2048,
         )
-        if media_type == "application/pdf":
-            kwargs['betas']=["pdfs-2024-09-25"]
-        print("preparing to query")
+        if pdf:
+            kwargs = dict(
+                **kwargs,
+                betas=["pdfs-2024-09-25"],
+                model="claude-3-5-sonnet-20241022",
+            )
+        start_time = time.time()
         response = client.beta.messages.create(**kwargs)
-        print("query complete")
+        end_time = time.time()
+        print(f"Summarize call took {end_time - start_time:.2f} seconds for file {file_path}")
         return response.content[0].text
     except Exception as e:
         raise Exception(f"Error calling Anthropic API: {str(e)}")
 
-def summarize(pdf_path, txt_path, api_key, media_type="application/pdf"):
+def summarize(pdf_path, txt_path, api_key, pdf=False):
     """
 Here is the full text of the research paper you need to analyze:
 
@@ -118,7 +124,7 @@ If you find that your analysis is becoming too long (approaching 1024 tokens), p
 Begin your response with your metric scan, followed by your metric evaluation, and then the JSON output.
 """
     try:
-        response = query_pdf(pdf_path, question, api_key, media_type=media_type)
+        response = query_pdf(pdf_path, question, api_key, pdf=pdf)
         with open(txt_path, 'w') as f:
             f.write(response)
         #print("Response:", response)
