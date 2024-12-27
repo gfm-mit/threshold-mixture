@@ -7,7 +7,7 @@ def read_pdf_as_base64(file_path: str) -> str:
         return base64.b64encode(f.read()).decode("utf-8")
 
 
-def query_pdf(pdf_path: str, question: str, api_key: str) -> str:
+def query_pdf(pdf_path: str, question: str, api_key: str, media_type: str = "application/pdf") -> str:
     """
     Upload a PDF and ask a question about it using the Anthropic API.
     
@@ -37,7 +37,7 @@ def query_pdf(pdf_path: str, question: str, api_key: str) -> str:
                     "type": "document",
                     "source": {
                         "type": "base64",
-                        "media_type": "application/pdf",
+                        "media_type": media_type,
                         "data": pdf_base64
                     }
                 },
