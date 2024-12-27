@@ -1,8 +1,6 @@
 import os
 import tempfile
 from PyPDF2 import PdfReader, PdfWriter
-import tqdm
-import requests
 
 def process_large_xobject(xobject, size_threshold, location_info="", verbose=True):
     """Helper function to check and potentially remove an image XObject"""
@@ -105,6 +103,54 @@ def remove_large_xobjects(input_filename, output_filename, max_size=1024, max_pa
     if temp_file:
         os.replace(temp_file, input_filename)
 
+def extract_pdf_text(input_filename, output_filename=None, max_pages=None):
+    """
+    Extracts text from a PDF file while maintaining reading order.
+    
+    Args:
+        input_filename (str): Path to the input PDF file
+        output_filename (str, optional): Path to save the extracted text. If None, returns the text as a string
+        max_pages (int, optional): Maximum number of pages to process. If None, processes all pages
+    
+    Returns:
+        str: Extracted text if output_filename is None, otherwise None
+    """
+    try:
+        # Open and read the PDF file
+        print(f"Reading PDF: {input_filename}")
+        reader = PdfReader(input_filename)
+        
+        # Determine number of pages to process
+        num_pages = len(reader.pages)
+        if max_pages is not None:
+            num_pages = min(num_pages, max_pages)
+        
+        # Extract text from each page
+        extracted_text = []
+        for page_num in range(num_pages):
+            page = reader.pages[page_num]
+            # Extract text while preserving order
+            text = page.extract_text()
+            if text.strip():  # Only add non-empty pages
+                extracted_text.append(text)
+        
+        # Join all text with double newlines between pages
+        full_text = "\n\n".join(extracted_text)
+        
+        # If output filename is provided, save to file
+        if output_filename:
+            os.makedirs(os.path.dirname(output_filename), exist_ok=True)
+            with open(output_filename, 'w', encoding='utf-8') as f:
+                f.write(full_text)
+            print(f"Text saved to: {output_filename}")
+            return None
+        
+        return full_text
+    
+    except Exception as e:
+        print(f"Error processing PDF: {str(e)}")
+        return None
+
 def strip_pdf(raw_filename, verbose=True):
   stripped_filename = raw_filename.replace('raw_pdfs/', 'stripped_pdfs/')
   if os.path.exists(stripped_filename):
@@ -112,3 +158,11 @@ def strip_pdf(raw_filename, verbose=True):
       return stripped_filename
   remove_large_xobjects(raw_filename, stripped_filename, max_pages=10, max_size=1024, verbose=verbose)
   return stripped_filename
+
+def text_pdf(raw_filename):
+  text_filename = raw_filename.replace('raw_pdfs/', 'text_pdfs/')
+  if os.path.exists(text_filename):
+      #print("stripped pdf already exists:", text_filename)
+      return text_filename
+  extract_pdf_text(raw_filename, text_filename, max_pages=None)
+  return text_filename
