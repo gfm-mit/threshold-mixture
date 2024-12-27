@@ -95,16 +95,17 @@ Recall, Precision, F1, Accuracy, Net Cost, Net Benefit, AUC-ROC, AUC-PR, Decisio
 Follow these steps:
 
 1. Carefully read through the research paper content.
-2. In <metric_scan> tags, for each metric in the list above:
+2. In <classifier_type> tags, describe whether the the paper describes a binary classifier.  Acceptable values are "none", "binary" and "multiclass".
+3. In <metric_scan> tags, for each metric in the list above:
    a. Search for mentions of the metric in the paper.
    b. If found, write down relevant quotes that mention or describe the use of the metric.
    c. If not found, note its absence.
-3. In <metric_evaluation> tags, analyze your findings for each metric:
+4. In <metric_evaluation> tags, analyze your findings for each metric:
    - Determine if it is present in the paper based on the quotes you found.
    - If present, briefly explain the context of its use.
    - If not present, note its absence.
    - Keep your analysis concise to ensure all metrics can be covered.
-4. After analyzing all metrics, compile your findings into a structured JSON array.
+5. After analyzing all metrics, compile your findings into a structured JSON array.
 
 Your final output should be a JSON array containing objects for each of the listed metrics, regardless of whether they are present in the paper or not. The array should have the following structure:
 
