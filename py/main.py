@@ -5,6 +5,7 @@ import pprint
 import requests
 import time
 import tqdm
+import py.openreview
 import py.pdf
 import py.anthropic
 
@@ -33,20 +34,27 @@ def process(icml_dict, overwrite=False):
 
 # Example usage
 if __name__ == "__main__":
-    with open('./data/icml_2024_poster.json', 'r') as f:
+    with open('./data/icml_2024_oral.json', 'r') as f:
         data = json.load(f)['notes']
-    assert False, (len(data))
+    #assert False, (len(data))
 
     with open('local/anthropic.key', 'r') as f:
         api_key = f.read()
     
     for icml_dict in tqdm.cli.tqdm(data):
       paperhash = icml_dict['content']['paperhash']['value']
-      pdf_path = process(icml_dict, overwrite=False)
-      txt_path = pdf_path.replace('.pdf', '.txt').replace('stripped_pdfs/', 'summaries/')
-      #if os.path.exists(txt_path):
-      #  print('file already exists')
-      #else:
-      if True:
-        py.anthropic.summarize(pdf_path, txt_path, api_key)
-        time.sleep(1)
+      raw_path = py.openreview.download(icml_dict, prefix="icml_2024_oral_", already_downloaded=False)
+      #stripped_path = py.pdf.strip_pdf(raw_path, verbose=False)
+      text_path = py.pdf.text_pdf(raw_path)
+      #time.sleep(1)
+      out_path = text_path.replace('.pdf', '.txt').replace('text_pdfs/', 'summaries/')
+      if os.path.exists(out_path):
+        print('file already exists')
+      else:
+        if True:
+          file_size = os.path.getsize(text_path)
+          if file_size > 1000000:
+            print("skipping large file")
+            continue
+          py.anthropic.summarize(text_path, out_path, api_key, pdf=False)
+          #time.sleep(10)
