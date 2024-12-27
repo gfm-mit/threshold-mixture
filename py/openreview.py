@@ -38,7 +38,7 @@ def download(icml_dict, prefix="", already_downloaded=False):
   if os.path.exists(raw_filename):
     #print("PDF already downloaded:", raw_filename)
     return raw_filename
-  else:
+  elif not already_downloaded:
     assert not already_downloaded
   response = requests.get(pdf_url)
   with open(raw_filename, 'wb') as f:
