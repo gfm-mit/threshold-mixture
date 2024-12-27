@@ -4,5 +4,6 @@ __pycache__/
 .env
 raw_pdfs/*
 stripped_pdfs/*
+text_pdfs/*
 local/*
 summaries/*
