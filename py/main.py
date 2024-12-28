@@ -32,22 +32,17 @@ def process(icml_dict, overwrite=False):
   py.pdf.clip_and_compress_pdf(raw_filename, stripped_filename, max_pages=8, image_max_size=(100, 100), image_quality=10)
   return stripped_filename
 
-# Example usage
-if __name__ == "__main__":
-    with open('./data/icml_2024_oral.json', 'r') as f:
-        data = json.load(f)['notes']
-    #assert False, (len(data))
-
-    with open('local/anthropic.key', 'r') as f:
-        api_key = f.read()
-    
-    for icml_dict in tqdm.cli.tqdm(data):
-      paperhash = icml_dict['content']['paperhash']['value']
-      raw_path = py.openreview.download(icml_dict, prefix="icml_2024_oral_", already_downloaded=False)
-      #stripped_path = py.pdf.strip_pdf(raw_path, verbose=False)
-      text_path = py.pdf.text_pdf(raw_path)
-      #time.sleep(1)
-      out_path = text_path.replace('.pdf', '.txt').replace('text_pdfs/', 'summaries/')
+def load_json(kind, api_key=None):
+  with open(f"./data/icml_2024_{kind}.json", 'r') as f:
+      data = json.load(f)['notes']
+  
+  for icml_dict in tqdm.cli.tqdm(data):
+    paperhash = icml_dict['content']['paperhash']['value']
+    raw_path = py.openreview.download(icml_dict, prefix=f"icml_2024_{kind}_", already_downloaded=True)
+    #stripped_path = py.pdf.strip_pdf(raw_path, verbose=False)
+    text_path = py.pdf.text_pdf(raw_path)
+    out_path = text_path.replace('.pdf', '.txt').replace('text_pdfs/', 'summaries/')
+    if api_key is not None:
       if os.path.exists(out_path):
         print('file already exists')
       else:
@@ -58,3 +53,9 @@ if __name__ == "__main__":
             continue
           py.anthropic.summarize(text_path, out_path, api_key, pdf=False)
           #time.sleep(10)
+
+# Example usage
+if __name__ == "__main__":
+  with open('local/anthropic.key', 'r') as f:
+      api_key = f.read()
+  load_json("poster", api_key=api_key)
